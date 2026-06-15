@@ -1,7 +1,7 @@
 """
 Multi-Agent Research System — API
 ===================================
-POST /research → 4 Agent 协作产出调研报告
+POST /research -> 5 Agent 协作产出调研报告
 """
 
 import sys
@@ -15,15 +15,14 @@ from pydantic import BaseModel, Field
 from core.llm import LLMService
 from core.graph import ResearchGraph
 
-
 app = FastAPI(
     title="Multi-Agent Research System",
-    description="Planner → Search → Analyze → Write → Review 协作调研",
-    version="1.0.0",
+    description="Planner -> Search -> Analyze -> Write -> Review",
+    version="1.1.0",
 )
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
-
-llm = LLMService()
+app.add_middleware(
+    CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"],
+)
 
 
 class ResearchRequest(BaseModel):
@@ -43,7 +42,7 @@ class ResearchResponse(BaseModel):
 
 @app.get("/")
 def root():
-    return {"service": "Multi-Agent Research System", "version": "1.0.0", "mode": "llm" if llm.available else "fallback"}
+    return {"service": "Multi-Agent Research System", "version": "1.1.0"}
 
 
 @app.get("/health")
@@ -53,11 +52,12 @@ def health():
 
 @app.post("/research", response_model=ResearchResponse)
 def research(req: ResearchRequest):
+    llm = LLMService()  # per-request: supports hot-reload of DEEPSEEK_API_KEY
     graph = ResearchGraph(llm)
     state = graph.run(req.topic, req.depth)
 
     if state.get("error"):
-        raise HTTPException(500, state["error"])
+        raise HTTPException(500, detail=f"Pipeline failed: {state['error']}")
 
     review = state.get("review", {})
     return ResearchResponse(
