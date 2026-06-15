@@ -68,13 +68,17 @@ class TestLLMService:
         assert isinstance(result, dict)
         assert "score" in result
 
-    def test_fallback_uses_explicit_mode(self):
+    def test_fallback_mode_is_thread_safe(self):
+        """_mode is now a local variable passed to _call, not an instance attr."""
         from core.llm import LLMService
         llm = LLMService(api_key=None)
-        llm.search("test query")
-        assert llm._mode == "search"
-        llm.plan("test topic")
-        assert llm._mode == "plan"
+        # verify no _mode instance attribute (thread-safe design)
+        assert not hasattr(llm, '_mode')
+        # verify both calls work concurrently-safe
+        result1 = llm.search("test query")
+        result2 = llm.plan("test topic")
+        assert isinstance(result1, str) and len(result1) > 10
+        assert isinstance(result2, list) and len(result2) >= 3
 
 
 class TestResearchGraphNodes:

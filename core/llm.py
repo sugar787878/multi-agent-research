@@ -19,7 +19,6 @@ class LLMService:
         self.api_key = api_key or os.getenv("DEEPSEEK_API_KEY")
         self.available = bool(self.api_key)
         self._client = None
-        self._mode: Optional[str] = None
         if self.available:
             try:
                 from openai import OpenAI
@@ -29,9 +28,9 @@ class LLMService:
             except ImportError:
                 self.available = False
 
-    def _call(self, system: str, user: str, temperature: float = 0.7) -> str:
+    def _call(self, system: str, user: str, mode: str = "", temperature: float = 0.7) -> str:
         if not self._client:
-            return self._fallback(user)
+            return self._fallback(user, mode)
         try:
             r = self._client.chat.completions.create(
                 model="deepseek-chat",
@@ -44,10 +43,9 @@ class LLMService:
             )
             return r.choices[0].message.content
         except Exception:
-            return self._fallback(user)
+            return self._fallback(user, mode)
 
-    def _fallback(self, user_input: str) -> str:
-        mode = self._mode or ""
+    def _fallback(self, user_input: str, mode: str = "") -> str:
         if mode == "plan":
             return json.dumps(
                 ["核心技术原理与架构设计", "主流方案对比分析",
@@ -84,35 +82,35 @@ class LLMService:
         return "分析完成。"
 
     def plan(self, topic: str, depth: str = "medium") -> List[str]:
-        self._mode = "plan"
+        mode = "plan"
         system = "你是一个技术规划师。将给定主题拆解为3-5个子问题。只返回JSON数组。"
         user = f"主题: {topic}\n深度: {depth}"
-        result = self._call(system, user)
+        result = self._call(system, user, mode=mode)
         try:
             return json.loads(result.strip().strip("```json").strip("```").strip())
         except json.JSONDecodeError:
             return ["核心技术原理", "主流方案对比", "工程实践要点", "发展趋势"]
 
     def search(self, question: str) -> str:
-        self._mode = "search"
+        mode = "search"
         system = "你是一个信息搜集专家。针对给定问题给出详尽的技术分析（2-3段）。"
-        return self._call(system, f"问题: {question}")
+        return self._call(system, f"问题: {question}", mode=mode)
 
     def analyze(self, topic: str, findings: List[str]) -> str:
-        self._mode = "analyze"
+        mode = "analyze"
         system = "你是一个技术分析师。综合所有调研发现，提炼关键洞察和模式。"
         text = "\n---\n".join(findings)
-        return self._call(system, f"主题: {topic}\n\n调研发现:\n{text}")
+        return self._call(system, f"主题: {topic}\n\n调研发现:\n{text}", mode=mode)
 
     def write(self, topic: str, analysis: str) -> str:
-        self._mode = "write"
+        mode = "write"
         system = "你是一个技术撰稿人。撰写结构化Markdown报告。"
-        return self._call(system, f"主题: {topic}\n\n分析:\n{analysis}")
+        return self._call(system, f"主题: {topic}\n\n分析:\n{analysis}", mode=mode)
 
     def review(self, report: str) -> Dict:
-        self._mode = "review"
+        mode = "review"
         system = "你是报告审核员。返回JSON: {\"score\": 1-5, \"strengths\": [...], \"weaknesses\": [...], \"suggestions\": \"...\"}"
-        result = self._call(system, f"报告:\n{report[:2000]}")
+        result = self._call(system, f"报告:\n{report[:2000]}", mode=mode)
         try:
             return json.loads(result.strip().strip("```json").strip("```").strip())
         except json.JSONDecodeError:

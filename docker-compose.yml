@@ -8,3 +8,8 @@ services:
     environment:
       - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
